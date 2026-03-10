@@ -1,12 +1,24 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, copyFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, dirname } from "node:path";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
-import { DEFAULT_CONFIG } from "../types.js";
 
 const execFileAsync = promisify(execFile);
+
+const PACKAGE_ROOT = join(fileURLToPath(import.meta.url), "..", "..", "..");
+
+const SKILL_FILES = ["review", "audit"] as const;
+const AGENT_FILES = [
+  "scout",
+  "security",
+  "correctness",
+  "performance",
+  "style",
+  "api-contract",
+] as const;
 
 const ask = async (question: string): Promise<string> => {
   const rl = createInterface({ input: process.stdin, output: process.stderr });
@@ -18,61 +30,53 @@ const ask = async (question: string): Promise<string> => {
   });
 };
 
-const checkPrerequisite = async (cmd: string, args: string[], name: string): Promise<boolean> => {
+const checkPrerequisite = async (
+  cmd: string,
+  args: string[],
+  name: string,
+): Promise<boolean> => {
   try {
     await execFileAsync(cmd, args);
     process.stderr.write(`  \u2713 ${name}\n`);
     return true;
   } catch {
-    process.stderr.write(`  \u2717 ${name} \u2014 not found or not authenticated\n`);
+    process.stderr.write(`  \u2717 ${name} \u2014 not found\n`);
     return false;
   }
 };
 
-const readJsonFile = async (path: string): Promise<Record<string, unknown>> => {
-  try {
-    const raw = await readFile(path, "utf-8");
-    return JSON.parse(raw);
-  } catch {
-    return {};
-  }
-};
+export const installFiles = async (
+  scope: "global" | "project",
+  packageRoot: string = PACKAGE_ROOT,
+  home: string = homedir(),
+  cwd: string = process.cwd(),
+): Promise<void> => {
+  const targetDir =
+    scope === "global"
+      ? join(home, ".claude")
+      : join(cwd, ".claude");
 
-const writeJsonFile = async (path: string, data: Record<string, unknown>): Promise<void> => {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, JSON.stringify(data, null, 2) + "\n", "utf-8");
-};
+  const skillsDir = join(targetDir, "skills");
+  const agentsDir = join(targetDir, "agents");
 
-const HOOK_ENTRY = {
-  matcher: "Bash",
-  hooks: [
-    {
-      type: "command",
-      command: "crev hook-handler",
-      timeout: 5,
-    },
-  ],
-};
+  await mkdir(skillsDir, { recursive: true });
+  await mkdir(agentsDir, { recursive: true });
 
-const addHookToSettings = async (settingsPath: string): Promise<void> => {
-  const settings = await readJsonFile(settingsPath);
-  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-  const postToolUse = (hooks.PostToolUse ?? []) as Record<string, unknown>[];
-
-  const alreadyInstalled = postToolUse.some(
-    (h) => JSON.stringify(h).includes("crev"),
-  );
-  if (alreadyInstalled) {
-    process.stderr.write("Hook already installed.\n");
-    return;
+  for (const name of SKILL_FILES) {
+    await copyFile(
+      join(packageRoot, "skills", `${name}.md`),
+      join(skillsDir, `crev-${name}.md`),
+    );
+    process.stderr.write(`  \u2713 skills/crev-${name}.md\n`);
   }
 
-  const updatedPostToolUse = [...postToolUse, HOOK_ENTRY];
-  const updatedSettings = {
-    ...settings,
-    hooks: { ...hooks, PostToolUse: updatedPostToolUse },
-  };
-  await writeJsonFile(settingsPath, updatedSettings);
+  for (const name of AGENT_FILES) {
+    await copyFile(
+      join(packageRoot, "agents", `${name}.md`),
+      join(agentsDir, `crev-${name}.md`),
+    );
+    process.stderr.write(`  \u2713 agents/crev-${name}.md\n`);
+  }
 };
 
 interface InitOptions {
@@ -80,51 +84,48 @@ interface InitOptions {
   readonly project?: boolean;
 }
 
-export const runInitCommand = async (options: InitOptions = {}): Promise<void> => {
+export const runInitCommand = async (
+  options: InitOptions = {},
+): Promise<void> => {
   process.stderr.write("crev \u2014 Setup\n\n");
 
-  // Check prerequisites
   process.stderr.write("Checking prerequisites:\n");
-  const ghOk = await checkPrerequisite("gh", ["auth", "status"], "gh CLI (authenticated)");
-  const claudeOk = await checkPrerequisite("claude", ["--version"], "claude CLI");
+  const claudeOk = await checkPrerequisite(
+    "claude",
+    ["--version"],
+    "claude CLI",
+  );
 
-  if (!ghOk || !claudeOk) {
-    process.stderr.write("\nMissing prerequisites. Please install and configure the tools above.\n");
+  if (!claudeOk) {
+    process.stderr.write(
+      "\nMissing prerequisites. Install the claude CLI first.\n",
+    );
     process.exit(1);
   }
 
-  // Determine scope
   let scope: "global" | "project";
   if (options.global) {
     scope = "global";
   } else if (options.project) {
     scope = "project";
   } else {
-    process.stderr.write("\nWhere should the hook be installed?\n");
-    process.stderr.write("  [1] Global \u2014 triggers for all repos (~/.claude/settings.json)\n");
-    process.stderr.write("  [2] This project \u2014 triggers only here (.claude/settings.local.json)\n");
+    process.stderr.write("\nWhere should skills and agents be installed?\n");
+    process.stderr.write(
+      "  [1] Global \u2014 available in all projects (~/.claude/)\n",
+    );
+    process.stderr.write(
+      "  [2] This project \u2014 available here only (.claude/)\n",
+    );
     const answer = await ask("\nChoice [1/2]: ");
     scope = answer === "2" ? "project" : "global";
   }
 
-  // Install hook
-  const settingsPath =
-    scope === "global"
-      ? join(homedir(), ".claude", "settings.json")
-      : join(process.cwd(), ".claude", "settings.local.json");
+  process.stderr.write("\nInstalling skills and agents:\n");
+  await installFiles(scope);
 
-  process.stderr.write(`\nInstalling hook to ${settingsPath}...\n`);
-  await addHookToSettings(settingsPath);
-
-  // Write default config
-  const configPath =
-    scope === "global"
-      ? join(homedir(), ".config", "crev", "config.json")
-      : join(process.cwd(), ".claude", "code-review.json");
-
-  process.stderr.write(`Writing default config to ${configPath}...\n`);
-  await writeJsonFile(configPath, DEFAULT_CONFIG as unknown as Record<string, unknown>);
-
-  process.stderr.write(`\nInstalled (${scope}). Code reviews will trigger automatically on PR creation.\n`);
-  process.stderr.write(`Edit ${configPath} to customize behavior.\n`);
+  const location =
+    scope === "global" ? "~/.claude/" : ".claude/";
+  process.stderr.write(
+    `\nInstalled to ${location}\nUse /crev:review or /crev:audit in Claude Code.\n`,
+  );
 };
