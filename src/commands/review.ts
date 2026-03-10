@@ -13,7 +13,11 @@ const log = (msg: string): void => {
 };
 
 const makeInvokeFn = () => {
-  return async (systemPrompt: string, userMessage: string, model: string): Promise<string> => {
+  return async (
+    systemPrompt: string,
+    userMessage: string,
+    model: string,
+  ): Promise<string> => {
     return invokeClaude({ systemPrompt, userMessage, model });
   };
 };
@@ -23,7 +27,9 @@ interface ReviewCommandInput {
   readonly configOverride?: Partial<PluginConfig>;
 }
 
-export const runReviewCommand = async (input: ReviewCommandInput): Promise<void> => {
+export const runReviewCommand = async (
+  input: ReviewCommandInput,
+): Promise<void> => {
   const config = await loadConfig();
   const mergedConfig = input.configOverride
     ? { ...config, ...input.configOverride }
@@ -47,8 +53,12 @@ export const runReviewCommand = async (input: ReviewCommandInput): Promise<void>
     metadata,
     model: mergedConfig.scout.model,
     invoke,
+    escalation: mergedConfig.scout.escalation,
+    minLinesForEscalation: mergedConfig.scout.minLinesForEscalation,
   });
-  log(`Scout: ${scoutResult.findings.length} findings, escalate=${scoutResult.escalate}`);
+  log(
+    `Scout: ${scoutResult.findings.length} findings, escalate=${scoutResult.escalate}`,
+  );
   if (scoutResult.escalateReason) {
     log(`Escalation reason: ${scoutResult.escalateReason}`);
   }
@@ -64,8 +74,13 @@ export const runReviewCommand = async (input: ReviewCommandInput): Promise<void>
       reviewers: SPECIALISTS,
       invoke,
     });
-    const totalFindings = specialistResults.reduce((sum, r) => sum + r.findings.length, 0);
-    log(`Specialists: ${totalFindings} findings across ${SPECIALISTS.length} reviewers`);
+    const totalFindings = specialistResults.reduce(
+      (sum, r) => sum + r.findings.length,
+      0,
+    );
+    log(
+      `Specialists: ${totalFindings} findings across ${SPECIALISTS.length} reviewers`,
+    );
   }
 
   // Phase 3: Aggregate
@@ -79,7 +94,10 @@ export const runReviewCommand = async (input: ReviewCommandInput): Promise<void>
 
   // Phase 4: Output
   if (mergedConfig.output.local) {
-    const path = await writeLocalReport(aggregated, mergedConfig.output.localDir);
+    const path = await writeLocalReport(
+      aggregated,
+      mergedConfig.output.localDir,
+    );
     log(`Local report: ${path}`);
   }
 

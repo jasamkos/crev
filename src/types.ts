@@ -67,6 +67,8 @@ export interface ReviewerConfig {
   readonly systemPrompt: string;
 }
 
+export type EscalationThreshold = "conservative" | "balanced" | "minimal";
+
 export interface PluginConfig {
   readonly output: {
     readonly local: boolean;
@@ -76,6 +78,8 @@ export interface PluginConfig {
   };
   readonly scout: {
     readonly model: string;
+    readonly escalation: EscalationThreshold;
+    readonly minLinesForEscalation: number;
   };
   readonly specialists: {
     readonly model: string;
@@ -91,6 +95,8 @@ export const DEFAULT_CONFIG: PluginConfig = {
   },
   scout: {
     model: "sonnet",
+    escalation: "balanced",
+    minLinesForEscalation: 20,
   },
   specialists: {
     model: "sonnet",

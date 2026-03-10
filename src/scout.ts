@@ -1,5 +1,10 @@
 import { parseClaudeJsonResponse } from "./claude.js";
-import type { ScoutResult, Finding, PrMetadata } from "./types.js";
+import type {
+  ScoutResult,
+  Finding,
+  PrMetadata,
+  EscalationThreshold,
+} from "./types.js";
 
 const MAX_DIFF_CHARS = 100_000;
 
@@ -55,7 +60,8 @@ Rules:
 const formatDiffWithContext = (diff: string, metadata: PrMetadata): string => {
   const truncated =
     diff.length > MAX_DIFF_CHARS
-      ? diff.slice(0, MAX_DIFF_CHARS) + "\n\n[... diff truncated at 100k chars ...]"
+      ? diff.slice(0, MAX_DIFF_CHARS) +
+        "\n\n[... diff truncated at 100k chars ...]"
       : diff;
 
   const fileList = metadata.changedFiles
@@ -95,10 +101,13 @@ export const parseScoutResponse = (raw: string): ScoutResult => {
     return {
       reviewer: "Scout",
       findings,
-      summary: typeof parsed.summary === "string" ? parsed.summary : "No summary",
+      summary:
+        typeof parsed.summary === "string" ? parsed.summary : "No summary",
       escalate: typeof parsed.escalate === "boolean" ? parsed.escalate : true,
       escalateReason:
-        typeof parsed.escalateReason === "string" ? parsed.escalateReason : null,
+        typeof parsed.escalateReason === "string"
+          ? parsed.escalateReason
+          : null,
     };
   } catch {
     return {
@@ -111,24 +120,83 @@ export const parseScoutResponse = (raw: string): ScoutResult => {
   }
 };
 
-type InvokeFn = (systemPrompt: string, userMessage: string, model: string) => Promise<string>;
+type InvokeFn = (
+  systemPrompt: string,
+  userMessage: string,
+  model: string,
+) => Promise<string>;
+
+const SENSITIVE_PATTERNS = [
+  /auth/i,
+  /login/i,
+  /password/i,
+  /secret/i,
+  /token/i,
+  /crypt/i,
+  /permission/i,
+  /role/i,
+  /admin/i,
+  /sql/i,
+  /query/i,
+  /migration/i,
+  /docker/i,
+  /ci[/-]/i,
+  /\.env/i,
+  /credential/i,
+  /session/i,
+];
+
+const touchesSensitivePaths = (metadata: PrMetadata): boolean =>
+  metadata.changedFiles.some((f) =>
+    SENSITIVE_PATTERNS.some((p) => p.test(f.path)),
+  );
+
+export const shouldSkipEscalation = (
+  metadata: PrMetadata,
+  minLines: number,
+): boolean => {
+  const totalChanges = metadata.totalAdditions + metadata.totalDeletions;
+  if (totalChanges >= minLines) return false;
+  if (touchesSensitivePaths(metadata)) return false;
+  return true;
+};
+
+const ESCALATION_PROMPT_SUFFIX: Record<EscalationThreshold, string> = {
+  conservative: `\n\nEscalation bias: CONSERVATIVE. When in doubt, escalate. Only skip escalation for trivially simple changes you are 100% confident about.`,
+  balanced: `\n\nEscalation bias: BALANCED. Use your best judgment. Escalate when the change has meaningful complexity or risk.`,
+  minimal: `\n\nEscalation bias: MINIMAL. Only escalate for clearly high-risk changes (security, complex logic, breaking API). Prefer handling the review yourself when possible.`,
+};
 
 interface RunScoutInput {
   readonly diff: string;
   readonly metadata: PrMetadata;
   readonly model: string;
   readonly invoke: InvokeFn;
+  readonly escalation?: EscalationThreshold;
+  readonly minLinesForEscalation?: number;
 }
 
 export const runScout = async (input: RunScoutInput): Promise<ScoutResult> => {
+  const escalation = input.escalation ?? "balanced";
+  const minLines = input.minLinesForEscalation ?? 20;
+
   try {
+    const systemPrompt =
+      SCOUT_SYSTEM_PROMPT + ESCALATION_PROMPT_SUFFIX[escalation];
     const userMessage = formatDiffWithContext(input.diff, input.metadata);
-    const response = await input.invoke(
-      SCOUT_SYSTEM_PROMPT,
-      userMessage,
-      input.model,
-    );
-    return parseScoutResponse(response);
+    const response = await input.invoke(systemPrompt, userMessage, input.model);
+    const result = parseScoutResponse(response);
+
+    // Size-based pre-filter: skip escalation for tiny PRs on non-sensitive paths
+    if (result.escalate && shouldSkipEscalation(input.metadata, minLines)) {
+      return {
+        ...result,
+        escalate: false,
+        escalateReason: `Skipped: PR under ${minLines} changed lines and no sensitive paths`,
+      };
+    }
+
+    return result;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return {

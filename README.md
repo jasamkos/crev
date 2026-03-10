@@ -57,6 +57,8 @@ Config file location depends on install scope:
 - Global: `~/.config/crev/config.json`
 - Project: `.claude/code-review.json`
 
+Project config overrides global config. Both are optional — defaults are sensible.
+
 ```json
 {
   "output": {
@@ -66,13 +68,49 @@ Config file location depends on install scope:
     "githubIssueLabels": ["code-review"]
   },
   "scout": {
-    "model": "sonnet"
+    "model": "sonnet",
+    "escalation": "balanced",
+    "minLinesForEscalation": 20
   },
   "specialists": {
     "model": "sonnet"
   }
 }
 ```
+
+### Output options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `output.local` | `true` | Write markdown reports to a local directory |
+| `output.localDir` | `"reviews"` | Directory for local reports (relative to cwd) |
+| `output.githubIssue` | `false` | Create a GitHub issue when findings exist |
+| `output.githubIssueLabels` | `["code-review"]` | Labels to apply to created issues |
+
+### Escalation control
+
+The scout agent decides whether to launch 5 specialist reviewers. Two settings control this:
+
+**`scout.escalation`** — how aggressively the scout escalates:
+
+| Value | Behavior |
+|-------|----------|
+| `"conservative"` | Escalate unless trivially simple. Safest, highest cost. |
+| `"balanced"` | Escalate for meaningful complexity or risk. **(default)** |
+| `"minimal"` | Only escalate for clearly high-risk changes. Cheapest. |
+
+**`scout.minLinesForEscalation`** — size-based pre-filter (default: `20`):
+- PRs with fewer total changed lines than this threshold are **never escalated**, regardless of what the scout decides
+- Exception: PRs touching sensitive paths (auth, credentials, .env, migrations, Docker, CI) are **always** eligible for escalation regardless of size
+
+### Model selection
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `scout.model` | `"sonnet"` | Model for the scout agent |
+| `specialists.model` | `"sonnet"` | Model for the 5 specialist reviewers |
+
+Use `"haiku"` for lower cost, `"opus"` for deepest analysis. Any model supported by your `claude` CLI works.
 
 ## Uninstall
 
