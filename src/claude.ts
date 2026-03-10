@@ -1,7 +1,4 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { spawn } from "node:child_process";
 
 type ExecFn = (
   cmd: string,
@@ -9,16 +6,44 @@ type ExecFn = (
   options?: { input?: string },
 ) => Promise<string>;
 
-const defaultExec: ExecFn = async (cmd, args, options) => {
-  const { stdout } = await execFileAsync(cmd, [...args], {
-    input: options?.input,
-    maxBuffer: 10 * 1024 * 1024,
-    timeout: 120_000,
+const defaultExec: ExecFn = (cmd, args, options) => {
+  return new Promise((resolve, reject) => {
+    const child = spawn(cmd, [...args], {
+      stdio: ["pipe", "pipe", "pipe"],
+      timeout: 120_000,
+    });
+
+    const chunks: Buffer[] = [];
+    child.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+    let stderr = "";
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("close", (code) => {
+      const stdout = Buffer.concat(chunks).toString("utf-8");
+      if (code !== 0) {
+        reject(new Error(`${cmd} exited with code ${code}: ${stderr}`));
+      } else {
+        resolve(stdout);
+      }
+    });
+
+    child.on("error", reject);
+
+    if (options?.input) {
+      child.stdin.write(options.input);
+      child.stdin.end();
+    } else {
+      child.stdin.end();
+    }
   });
-  return stdout;
 };
 
-export const parseClaudeJsonResponse = (raw: string): Record<string, unknown> => {
+export const parseClaudeJsonResponse = (
+  raw: string,
+): Record<string, unknown> => {
   // Try direct parse
   try {
     return JSON.parse(raw);
