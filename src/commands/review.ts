@@ -1,4 +1,11 @@
-import { parsePrUrl, fetchDiff, fetchPrMetadata } from "../diff.js";
+import {
+  parsePrUrl,
+  fetchDiff,
+  fetchPrMetadata,
+  detectBaseBranch,
+  fetchLocalDiff,
+  fetchLocalMetadata,
+} from "../diff.js";
 import { invokeClaude } from "../claude.js";
 import { runScout } from "../scout.js";
 import { SPECIALISTS } from "../reviewers.js";
@@ -6,7 +13,7 @@ import { runSpecialists } from "../runner.js";
 import { aggregateReviews } from "../aggregator.js";
 import { writeLocalReport, createGithubIssue } from "../output.js";
 import { loadConfig } from "../config.js";
-import type { PluginConfig, ReviewResult } from "../types.js";
+import type { PluginConfig, PrMetadata, ReviewResult } from "../types.js";
 
 const log = (msg: string): void => {
   process.stderr.write(`[crev] ${msg}\n`);
@@ -23,9 +30,34 @@ const makeInvokeFn = () => {
 };
 
 interface ReviewCommandInput {
-  readonly prUrl: string;
+  readonly prUrl?: string;
   readonly configOverride?: Partial<PluginConfig>;
 }
+
+const fetchFromPr = async (
+  prUrl: string,
+): Promise<{ diff: string; metadata: PrMetadata }> => {
+  const prRef = parsePrUrl(prUrl);
+  log(`Reviewing ${prRef.owner}/${prRef.repo}#${prRef.number}`);
+  const [diff, metadata] = await Promise.all([
+    fetchDiff(prRef),
+    fetchPrMetadata(prRef, prUrl),
+  ]);
+  return { diff, metadata };
+};
+
+const fetchFromLocal = async (): Promise<{
+  diff: string;
+  metadata: PrMetadata;
+}> => {
+  const baseBranch = await detectBaseBranch();
+  log(`Reviewing local changes against ${baseBranch}`);
+  const [diff, metadata] = await Promise.all([
+    fetchLocalDiff(baseBranch),
+    fetchLocalMetadata(baseBranch),
+  ]);
+  return { diff, metadata };
+};
 
 export const runReviewCommand = async (
   input: ReviewCommandInput,
@@ -35,13 +67,10 @@ export const runReviewCommand = async (
     ? { ...config, ...input.configOverride }
     : config;
 
-  const prRef = parsePrUrl(input.prUrl);
-  log(`Reviewing ${prRef.owner}/${prRef.repo}#${prRef.number}`);
+  const { diff, metadata } = input.prUrl
+    ? await fetchFromPr(input.prUrl)
+    : await fetchFromLocal();
 
-  const [diff, metadata] = await Promise.all([
-    fetchDiff(prRef),
-    fetchPrMetadata(prRef, input.prUrl),
-  ]);
   log(`Diff: ${diff.length} chars, ${metadata.changedFiles.length} files`);
 
   const invoke = makeInvokeFn();
@@ -85,7 +114,7 @@ export const runReviewCommand = async (
 
   // Phase 3: Aggregate
   const aggregated = aggregateReviews(
-    input.prUrl,
+    metadata.url,
     metadata.title,
     scoutResult,
     specialistResults,
@@ -101,7 +130,8 @@ export const runReviewCommand = async (
     log(`Local report: ${path}`);
   }
 
-  if (mergedConfig.output.githubIssue && aggregated.stats.total > 0) {
+  if (mergedConfig.output.githubIssue && aggregated.stats.total > 0 && input.prUrl) {
+    const prRef = parsePrUrl(input.prUrl);
     try {
       const issueUrl = await createGithubIssue(
         aggregated,

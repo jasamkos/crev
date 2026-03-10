@@ -3,16 +3,17 @@
 import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 
-const usage = `crev \u2014 Automated PR reviews with Claude
+const usage = `crev \u2014 Code review with Claude
 
 Usage:
+  crev review                         Review local branch changes (default)
+  crev review --pr <url>              Review a GitHub PR
   crev init [--global | --project]    Install the hook
   crev uninstall                      Remove hooks and config
-  crev review --pr <url>              Run review manually
   crev hook-handler                   (internal) Called by hook, reads stdin
 
 Options:
-  --pr <url>        GitHub PR URL to review
+  --pr <url>        GitHub PR URL (omit for local branch review)
   --global          Install hook globally
   --project         Install hook for current project only
   -h, --help        Show this help
@@ -99,10 +100,6 @@ const main = async (): Promise<void> => {
           pr: { type: "string", short: "p" },
         },
       });
-      if (!values.pr) {
-        process.stderr.write("Error: --pr <url> is required\n");
-        process.exit(1);
-      }
       const { runReviewCommand } = await import("../src/commands/review.js");
       await runReviewCommand({ prUrl: values.pr });
       break;
