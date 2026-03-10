@@ -32,11 +32,15 @@ npm install -g crev
 crev init
 ```
 
-`crev init` copies skill and agent markdown files into `~/.claude/` (global) or `.claude/` (project), making them available inside Claude Code.
+`crev init` installs skill and agent markdown files into `~/.claude/` (global) or `.claude/` (project), and wires a PostToolUse hook that auto-triggers reviews.
 
 ## Usage
 
-Inside Claude Code:
+### Automatic (hook)
+
+Reviews trigger automatically when you run `gh pr create` inside a Claude Code session. A new Claude instance starts in the background, runs `/crev:review`, and saves the report to `reviews/`.
+
+### Manual (inside Claude Code)
 
 ```
 /crev:review          Review current branch before pushing

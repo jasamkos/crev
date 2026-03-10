@@ -1,8 +1,8 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, copyFile } from "node:fs/promises";
+import { mkdir, copyFile, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline";
 
@@ -52,9 +52,7 @@ export const installFiles = async (
   cwd: string = process.cwd(),
 ): Promise<void> => {
   const targetDir =
-    scope === "global"
-      ? join(home, ".claude")
-      : join(cwd, ".claude");
+    scope === "global" ? join(home, ".claude") : join(cwd, ".claude");
 
   const skillsDir = join(targetDir, "skills");
   const agentsDir = join(targetDir, "agents");
@@ -77,6 +75,50 @@ export const installFiles = async (
     );
     process.stderr.write(`  \u2713 agents/crev-${name}.md\n`);
   }
+};
+
+const HOOK_ENTRY = {
+  matcher: "Bash",
+  hooks: [{ type: "command", command: "crev hook-handler", timeout: 5 }],
+};
+
+export const installHook = async (
+  scope: "global" | "project",
+  home: string = homedir(),
+  cwd: string = process.cwd(),
+): Promise<void> => {
+  const settingsPath =
+    scope === "global"
+      ? join(home, ".claude", "settings.json")
+      : join(cwd, ".claude", "settings.local.json");
+
+  let settings: Record<string, unknown> = {};
+  try {
+    settings = JSON.parse(await readFile(settingsPath, "utf-8"));
+  } catch {
+    // File doesn't exist yet — start fresh
+  }
+
+  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+  const postToolUse = (hooks.PostToolUse ?? []) as Record<string, unknown>[];
+
+  if (postToolUse.some((h) => JSON.stringify(h).includes("crev"))) {
+    process.stderr.write(`  \u2713 hook (already installed)\n`);
+    return;
+  }
+
+  const updated = {
+    ...settings,
+    hooks: { ...hooks, PostToolUse: [...postToolUse, HOOK_ENTRY] },
+  };
+
+  await mkdir(dirname(settingsPath), { recursive: true });
+  await writeFile(
+    settingsPath,
+    JSON.stringify(updated, null, 2) + "\n",
+    "utf-8",
+  );
+  process.stderr.write(`  \u2713 hook \u2192 ${settingsPath}\n`);
 };
 
 interface InitOptions {
@@ -120,12 +162,12 @@ export const runInitCommand = async (
     scope = answer === "2" ? "project" : "global";
   }
 
-  process.stderr.write("\nInstalling skills and agents:\n");
+  process.stderr.write("\nInstalling skills, agents, and hook:\n");
   await installFiles(scope);
+  await installHook(scope);
 
-  const location =
-    scope === "global" ? "~/.claude/" : ".claude/";
+  const location = scope === "global" ? "~/.claude/" : ".claude/";
   process.stderr.write(
-    `\nInstalled to ${location}\nUse /crev:review or /crev:audit in Claude Code.\n`,
+    `\nInstalled to ${location}\nReviews trigger automatically on \`gh pr create\`, or run /crev:review manually.\n`,
   );
 };

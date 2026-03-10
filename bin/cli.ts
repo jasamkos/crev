@@ -5,8 +5,8 @@ import { parseArgs } from "node:util";
 const usage = `crev \u2014 Code review skills for Claude Code
 
 Usage:
-  crev init [--global | --project]    Install /crev:review and /crev:audit skills
-  crev uninstall                      Remove installed skills and agents
+  crev init [--global | --project]    Install /crev:review and /crev:audit skills + hook
+  crev uninstall                      Remove installed skills, agents, and hook
 
 Options:
   --global          Install to ~/.claude/ (all projects)
@@ -16,7 +16,39 @@ Options:
 After install, use inside Claude Code:
   /crev:review      Review current branch before pushing
   /crev:audit       Review existing files or directories
+
+Reviews also trigger automatically when you run \`gh pr create\`.
 `;
+
+const readStdin = async (): Promise<string> => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of process.stdin) {
+    chunks.push(chunk as Buffer);
+  }
+  return Buffer.concat(chunks).toString("utf-8");
+};
+
+const handleHook = async (): Promise<void> => {
+  try {
+    const input = await readStdin();
+    const data = JSON.parse(input);
+    const command: string = data.tool_input?.command ?? "";
+
+    if (!command.includes("gh pr create")) return;
+
+    const { spawn } = await import("node:child_process");
+    const child = spawn(
+      "claude",
+      ["--dangerously-skip-permissions", "-p", "/crev:review"],
+      { detached: true, stdio: "ignore" },
+    );
+    child.unref();
+
+    process.stderr.write("[crev] Review started in background\n");
+  } catch {
+    // Never block Claude — fail silently
+  }
+};
 
 const main = async (): Promise<void> => {
   const subcommand = process.argv[2];
@@ -41,10 +73,14 @@ const main = async (): Promise<void> => {
     }
 
     case "uninstall": {
-      const { runUninstallCommand } = await import(
-        "../src/commands/uninstall.js"
-      );
+      const { runUninstallCommand } =
+        await import("../src/commands/uninstall.js");
       await runUninstallCommand();
+      break;
+    }
+
+    case "hook-handler": {
+      await handleHook();
       break;
     }
 

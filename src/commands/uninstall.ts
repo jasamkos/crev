@@ -37,16 +37,22 @@ export const removeFiles = async (
   }
 };
 
-const removeStaleHook = async (settingsPath: string): Promise<boolean> => {
+const removeHook = async (settingsPath: string): Promise<boolean> => {
   try {
     const raw = await readFile(settingsPath, "utf-8");
     const settings = JSON.parse(raw) as Record<string, unknown>;
     const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
     const postToolUse = (hooks.PostToolUse ?? []) as Record<string, unknown>[];
-    const filtered = postToolUse.filter((h) => !JSON.stringify(h).includes("crev"));
+    const filtered = postToolUse.filter(
+      (h) => !JSON.stringify(h).includes("crev"),
+    );
     if (filtered.length === postToolUse.length) return false;
     const updated = { ...settings, hooks: { ...hooks, PostToolUse: filtered } };
-    await writeFile(settingsPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
+    await writeFile(
+      settingsPath,
+      JSON.stringify(updated, null, 2) + "\n",
+      "utf-8",
+    );
     return true;
   } catch {
     return false;
@@ -58,11 +64,11 @@ export const runUninstallCommand = async (): Promise<void> => {
 
   let removed = false;
 
-  // Remove stale v0.1 PostToolUse hooks (migration from hook-based install)
+  // Remove PostToolUse hook from settings
   const globalSettings = join(homedir(), ".claude", "settings.json");
   const projectSettings = join(process.cwd(), ".claude", "settings.local.json");
   for (const path of [globalSettings, projectSettings]) {
-    if (await removeStaleHook(path)) {
+    if (await removeHook(path)) {
       process.stderr.write(`Removed stale hook from ${path}\n`);
       removed = true;
     }
