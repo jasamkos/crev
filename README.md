@@ -32,7 +32,11 @@ npm install -g crev
 crev init
 ```
 
-`crev init` installs skill and agent markdown files into `~/.claude/` (global) or `.claude/` (project), and wires a PostToolUse hook that auto-triggers reviews.
+The installer will ask:
+
+1. **Scope** — global (`~/.claude/`, all projects) or project-local (`.claude/`)
+2. **Model** — Haiku (fast/cheap) · Sonnet (default) · Opus (deepest analysis)
+3. **Auto-trigger** — enable automatic reviews on `git push` (Y/n)
 
 ## Usage
 
@@ -79,7 +83,7 @@ After `crev init`, the following files are installed:
 crev uninstall
 ```
 
-Removes all installed skill and agent files. Also removes stale v0.1 hooks if present.
+Removes all installed skill and agent files and the PostToolUse hook.
 
 ## Prerequisites
 
