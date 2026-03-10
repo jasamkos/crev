@@ -34,7 +34,8 @@ const handleHook = async (): Promise<void> => {
     const data = JSON.parse(input);
     const command: string = data.tool_input?.command ?? "";
 
-    if (!command.includes("gh pr create")) return;
+    if (!command.includes("gh pr create") && !command.includes("git push"))
+      return;
 
     const { spawn } = await import("node:child_process");
     const child = spawn(

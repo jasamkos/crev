@@ -38,7 +38,7 @@ crev init
 
 ### Automatic (hook)
 
-Reviews trigger automatically when you run `gh pr create` inside a Claude Code session. A new Claude instance starts in the background, runs `/crev:review`, and saves the report to `reviews/`.
+Reviews trigger automatically when you run `git push` or `gh pr create` inside a Claude Code session. A new Claude instance starts in the background, runs `/crev:review`, and saves the report to `reviews/`.
 
 ### Manual (inside Claude Code)
 
