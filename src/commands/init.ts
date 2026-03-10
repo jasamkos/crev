@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { mkdir, copyFile, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,16 @@ const AGENT_FILES = [
   "style",
   "api-contract",
 ] as const;
+
+const MODELS = {
+  haiku: "claude-haiku-4-5-20251001",
+  sonnet: "claude-sonnet-4-6",
+  opus: "claude-opus-4-6",
+} as const;
+
+type ModelChoice = keyof typeof MODELS;
+
+const DEFAULT_MODEL: ModelChoice = "sonnet";
 
 const ask = async (question: string): Promise<string> => {
   const rl = createInterface({ input: process.stdin, output: process.stderr });
@@ -52,6 +62,7 @@ const checkPrerequisite = async (
 
 export const installFiles = async (
   scope: "global" | "project",
+  model: ModelChoice = DEFAULT_MODEL,
   packageRoot: string = PACKAGE_ROOT,
   home: string = homedir(),
   cwd: string = process.cwd(),
@@ -66,18 +77,25 @@ export const installFiles = async (
   await mkdir(agentsDir, { recursive: true });
 
   for (const name of SKILL_FILES) {
-    await copyFile(
+    const content = await readFile(
       join(packageRoot, "skills", `${name}.md`),
-      join(skillsDir, `crev-${name}.md`),
+      "utf-8",
     );
+    await writeFile(join(skillsDir, `crev-${name}.md`), content, "utf-8");
     process.stderr.write(`  \u2713 skills/crev-${name}.md\n`);
   }
 
+  const modelId = MODELS[model];
   for (const name of AGENT_FILES) {
-    await copyFile(
+    const content = await readFile(
       join(packageRoot, "agents", `${name}.md`),
-      join(agentsDir, `crev-${name}.md`),
+      "utf-8",
     );
+    const patched = content.replace(
+      /^model: .+$/m,
+      `model: ${modelId}`,
+    );
+    await writeFile(join(agentsDir, `crev-${name}.md`), patched, "utf-8");
     process.stderr.write(`  \u2713 agents/crev-${name}.md\n`);
   }
 };
@@ -150,6 +168,7 @@ export const runInitCommand = async (
     process.exit(1);
   }
 
+  // Scope
   let scope: "global" | "project";
   if (options.global) {
     scope = "global";
@@ -167,12 +186,40 @@ export const runInitCommand = async (
     scope = answer === "2" ? "project" : "global";
   }
 
-  process.stderr.write("\nInstalling skills, agents, and hook:\n");
-  await installFiles(scope);
-  await installHook(scope);
+  // Model
+  process.stderr.write("\nWhich model should reviewers use?\n");
+  process.stderr.write(
+    "  [1] Haiku  \u2014 faster and cheaper (~$0.01 per review)\n",
+  );
+  process.stderr.write(
+    "  [2] Sonnet \u2014 balanced quality and cost (~$0.10 per review) [default]\n",
+  );
+  process.stderr.write(
+    "  [3] Opus   \u2014 deepest analysis (~$0.50 per review)\n",
+  );
+  const modelAnswer = await ask("\nChoice [1/2/3]: ");
+  const model: ModelChoice =
+    modelAnswer === "1" ? "haiku" : modelAnswer === "3" ? "opus" : "sonnet";
+
+  // Auto-trigger
+  process.stderr.write(
+    "\nAuto-review on \`git push\`? Reviews run in the background and save to reviews/\n",
+  );
+  const hookAnswer = await ask("Enable [Y/n]: ");
+  const enableHook = hookAnswer.toLowerCase() !== "n";
+
+  // Install
+  process.stderr.write("\nInstalling:\n");
+  await installFiles(scope, model);
+  if (enableHook) {
+    await installHook(scope);
+  }
 
   const location = scope === "global" ? "~/.claude/" : ".claude/";
+  const hookNote = enableHook
+    ? "Reviews trigger automatically on `git push`."
+    : "Auto-trigger disabled. Run /crev:review manually.";
   process.stderr.write(
-    `\nInstalled to ${location}\nReviews trigger automatically on \`git push\`, or run /crev:review manually.\n`,
+    `\nInstalled to ${location} (model: ${model})\n${hookNote}\n`,
   );
 };
