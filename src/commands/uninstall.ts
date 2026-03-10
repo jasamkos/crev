@@ -1,38 +1,52 @@
-import { readFile, writeFile, unlink } from "node:fs/promises";
+import { unlink, readFile, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const readJsonFile = async (path: string): Promise<Record<string, unknown> | null> => {
+const SKILL_FILES = ["review", "audit"] as const;
+const AGENT_FILES = [
+  "scout",
+  "security",
+  "correctness",
+  "performance",
+  "style",
+  "api-contract",
+] as const;
+
+const tryRemove = async (path: string): Promise<boolean> => {
   try {
-    const raw = await readFile(path, "utf-8");
-    return JSON.parse(raw);
+    await unlink(path);
+    return true;
   } catch {
-    return null;
+    return false;
   }
 };
 
-const removeHookFromSettings = async (settingsPath: string): Promise<boolean> => {
-  const settings = await readJsonFile(settingsPath);
-  if (!settings) return false;
+export const removeFiles = async (
+  scope: "global" | "project",
+  home: string = homedir(),
+  cwd: string = process.cwd(),
+): Promise<void> => {
+  const targetDir =
+    scope === "global" ? join(home, ".claude") : join(cwd, ".claude");
 
-  const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
-  const postToolUse = (hooks.PostToolUse ?? []) as Record<string, unknown>[];
-
-  const filtered = postToolUse.filter(
-    (h) => !JSON.stringify(h).includes("crev"),
-  );
-
-  if (filtered.length === postToolUse.length) return false;
-
-  const updatedHooks = { ...hooks, PostToolUse: filtered };
-  const updatedSettings = { ...settings, hooks: updatedHooks };
-  await writeFile(settingsPath, JSON.stringify(updatedSettings, null, 2) + "\n", "utf-8");
-  return true;
+  for (const name of SKILL_FILES) {
+    await tryRemove(join(targetDir, "skills", `crev-${name}.md`));
+  }
+  for (const name of AGENT_FILES) {
+    await tryRemove(join(targetDir, "agents", `crev-${name}.md`));
+  }
 };
 
-const tryRemoveFile = async (path: string): Promise<boolean> => {
+const removeStaleHook = async (settingsPath: string): Promise<boolean> => {
   try {
-    await unlink(path);
+    const raw = await readFile(settingsPath, "utf-8");
+    const settings = JSON.parse(raw) as Record<string, unknown>;
+    const hooks = (settings.hooks ?? {}) as Record<string, unknown[]>;
+    const postToolUse = (hooks.PostToolUse ?? []) as Record<string, unknown>[];
+    const filtered = postToolUse.filter((h) => !JSON.stringify(h).includes("crev"));
+    if (filtered.length === postToolUse.length) return false;
+    const updated = { ...settings, hooks: { ...hooks, PostToolUse: filtered } };
+    await writeFile(settingsPath, JSON.stringify(updated, null, 2) + "\n", "utf-8");
     return true;
   } catch {
     return false;
@@ -42,34 +56,43 @@ const tryRemoveFile = async (path: string): Promise<boolean> => {
 export const runUninstallCommand = async (): Promise<void> => {
   process.stderr.write("crev \u2014 Uninstall\n\n");
 
-  // Remove from global settings
+  let removed = false;
+
+  // Remove stale v0.1 PostToolUse hooks (migration from hook-based install)
   const globalSettings = join(homedir(), ".claude", "settings.json");
-  const removedGlobal = await removeHookFromSettings(globalSettings);
-  if (removedGlobal) {
-    process.stderr.write(`Removed hook from ${globalSettings}\n`);
-  }
-
-  // Remove from project settings
   const projectSettings = join(process.cwd(), ".claude", "settings.local.json");
-  const removedProject = await removeHookFromSettings(projectSettings);
-  if (removedProject) {
-    process.stderr.write(`Removed hook from ${projectSettings}\n`);
+  for (const path of [globalSettings, projectSettings]) {
+    if (await removeStaleHook(path)) {
+      process.stderr.write(`Removed stale hook from ${path}\n`);
+      removed = true;
+    }
   }
 
-  // Remove config files
-  const globalConfig = join(homedir(), ".config", "crev", "config.json");
-  const projectConfig = join(process.cwd(), ".claude", "code-review.json");
+  for (const scope of ["global", "project"] as const) {
+    const targetDir =
+      scope === "global"
+        ? join(homedir(), ".claude")
+        : join(process.cwd(), ".claude");
 
-  if (await tryRemoveFile(globalConfig)) {
-    process.stderr.write(`Removed ${globalConfig}\n`);
-  }
-  if (await tryRemoveFile(projectConfig)) {
-    process.stderr.write(`Removed ${projectConfig}\n`);
+    for (const name of SKILL_FILES) {
+      const path = join(targetDir, "skills", `crev-${name}.md`);
+      if (await tryRemove(path)) {
+        process.stderr.write(`Removed ${path}\n`);
+        removed = true;
+      }
+    }
+    for (const name of AGENT_FILES) {
+      const path = join(targetDir, "agents", `crev-${name}.md`);
+      if (await tryRemove(path)) {
+        process.stderr.write(`Removed ${path}\n`);
+        removed = true;
+      }
+    }
   }
 
-  if (!removedGlobal && !removedProject) {
-    process.stderr.write("No hooks found to remove.\n");
+  if (!removed) {
+    process.stderr.write("Nothing to remove.\n");
   } else {
-    process.stderr.write("\nUninstalled. Code reviews will no longer trigger.\n");
+    process.stderr.write("\nUninstalled.\n");
   }
 };
