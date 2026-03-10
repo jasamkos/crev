@@ -1,16 +1,17 @@
 # crev
 
-Code reviews with Claude. A scout agent reviews your changes and escalates to 5 specialist reviewers when needed. Run it locally before pushing — catch issues before they reach PR review.
+Code review skills for Claude Code. A scout agent reviews your changes and escalates to 5 specialist reviewers when needed. Run `/crev:review` inside Claude Code before pushing — catch issues before they reach PR review.
 
 ## How It Works
 
 ```
-crev review -> reviews local branch diff vs main
-  -> Scout agent reviews diff (single claude call)
+/crev:review
+  -> diff current branch vs main/master
+  -> crev-scout agent reviews diff
   -> Scout decides: escalate?
-     -> NO:  save scout findings -> done
-     -> YES: launch 5 specialists in parallel -> aggregate -> done
-  -> Output: local markdown file in reviews/
+     -> NO:  report scout findings
+     -> YES: launch 5 specialists in parallel -> consolidated report
+  -> Saves report to reviews/<branch>-<timestamp>.md
 ```
 
 ### Reviewers
@@ -28,94 +29,45 @@ crev review -> reviews local branch diff vs main
 
 ```bash
 npm install -g crev
+crev init
 ```
+
+`crev init` copies skill and agent markdown files into `~/.claude/` (global) or `.claude/` (project), making them available inside Claude Code.
 
 ## Usage
 
-### Local branch review (primary workflow)
+Inside Claude Code:
 
-After finishing your work, before pushing:
-
-```bash
-crev review
+```
+/crev:review          Review current branch before pushing
+/crev:audit [path]    Review existing files or directories (default: src/)
 ```
 
-This diffs your current branch against `main` (or `master`) and runs the review. Results appear in the `reviews/` directory as markdown files.
+### `/crev:review`
 
-### Review a GitHub PR
+Diffs the current branch against `main` (or `master`) and runs the review. Scout reviews first; if escalation is needed, all 5 specialists run in parallel. Findings are presented in the conversation and saved to `reviews/`.
 
-```bash
-crev review --pr https://github.com/owner/repo/pull/42
+### `/crev:audit`
+
+Reviews existing code at a path without requiring a diff. Useful for auditing existing files or directories you didn't write. All 5 specialists run in parallel.
+
+## File Structure
+
+After `crev init`, the following files are installed:
+
 ```
-
-### Hook-triggered (optional)
-
-You can also set up a Claude Code hook to auto-trigger reviews on PR creation:
-
-```bash
-crev init [--global | --project]
+~/.claude/
+  skills/
+    crev-review.md       # /crev:review skill
+    crev-audit.md        # /crev:audit skill
+  agents/
+    crev-scout.md        # Scout agent
+    crev-security.md     # Security specialist
+    crev-correctness.md  # Correctness specialist
+    crev-performance.md  # Performance specialist
+    crev-style.md        # Style specialist
+    crev-api-contract.md # API Contract specialist
 ```
-
-## Configuration
-
-Config file location:
-- Global: `~/.config/crev/config.json`
-- Project: `.claude/code-review.json`
-
-Project config overrides global config. Both are optional — defaults are sensible.
-
-```json
-{
-  "output": {
-    "local": true,
-    "localDir": "reviews",
-    "githubIssue": false,
-    "githubIssueLabels": ["code-review"]
-  },
-  "scout": {
-    "model": "sonnet",
-    "escalation": "balanced",
-    "minLinesForEscalation": 20
-  },
-  "specialists": {
-    "model": "sonnet"
-  }
-}
-```
-
-### Output options
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `output.local` | `true` | Write markdown reports to a local directory |
-| `output.localDir` | `"reviews"` | Directory for local reports (relative to cwd) |
-| `output.githubIssue` | `false` | Create a GitHub issue when findings exist (PR mode only) |
-| `output.githubIssueLabels` | `["code-review"]` | Labels to apply to created issues |
-
-### Escalation control
-
-The scout agent decides whether to launch 5 specialist reviewers. Two settings control this:
-
-**`scout.escalation`** — how aggressively the scout escalates:
-
-| Value | Behavior |
-|-------|----------|
-| `"conservative"` | Escalate unless trivially simple. Safest, highest cost. |
-| `"balanced"` | Escalate for meaningful complexity or risk. **(default)** |
-| `"minimal"` | Only escalate for clearly high-risk changes. Cheapest. |
-
-**`scout.minLinesForEscalation`** — size-based pre-filter (default: `20`):
-- PRs with fewer total changed lines than this threshold are **never escalated**, regardless of what the scout decides
-- Exception: changes touching sensitive paths (auth, credentials, .env, migrations, Docker, CI) are **always** eligible for escalation regardless of size
-
-### Model selection
-
-| Option | Default | Description |
-|--------|---------|-------------|
-| `scout.model` | `"sonnet"` | Model for the scout agent |
-| `specialists.model` | `"sonnet"` | Model for the 5 specialist reviewers |
-
-Use `"haiku"` for lower cost, `"opus"` for deepest analysis. Any model supported by your `claude` CLI works.
 
 ## Uninstall
 
@@ -123,20 +75,9 @@ Use `"haiku"` for lower cost, `"opus"` for deepest analysis. Any model supported
 crev uninstall
 ```
 
-Removes hooks from both global and project settings, plus config files.
+Removes all installed skill and agent files. Also removes stale v0.1 hooks if present.
 
 ## Prerequisites
 
-- `claude` CLI configured (works with any auth: Bedrock, API key, or subscription)
-- `gh` CLI authenticated (only needed for `--pr` mode and GitHub issue creation)
+- `claude` CLI (Claude Code) installed and configured
 - Node.js >= 20
-
-## Cost Estimates
-
-Per review (Sonnet):
-- Scout only: ~$0.02-0.05
-- Full review (scout + 5 specialists): ~$0.12-0.30
-
-Per review (Haiku):
-- Scout only: ~$0.002-0.005
-- Full review: ~$0.012-0.030
