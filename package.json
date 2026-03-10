@@ -5,8 +5,10 @@
   "bin": {
     "crev": "./dist/bin/cli.js"
   },
+  "files": ["dist"],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsx bin/cli.ts",
     "test": "vitest run",
     "test:watch": "vitest"
