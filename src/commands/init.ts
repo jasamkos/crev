@@ -8,7 +8,12 @@ import { createInterface } from "node:readline";
 
 const execFileAsync = promisify(execFile);
 
-const PACKAGE_ROOT = join(fileURLToPath(import.meta.url), "..", "..", "..");
+const PACKAGE_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+);
 
 const SKILL_FILES = ["review", "audit"] as const;
 const AGENT_FILES = [
@@ -168,6 +173,6 @@ export const runInitCommand = async (
 
   const location = scope === "global" ? "~/.claude/" : ".claude/";
   process.stderr.write(
-    `\nInstalled to ${location}\nReviews trigger automatically on \`gh pr create\`, or run /crev:review manually.\n`,
+    `\nInstalled to ${location}\nReviews trigger automatically on \`git push\`, or run /crev:review manually.\n`,
   );
 };
