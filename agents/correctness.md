@@ -1,5 +1,5 @@
 ---
-name: crev-correctness
+name: correctness
 description: Correctness-focused code reviewer. Finds logic errors, null handling gaps, race conditions, and unhandled edge cases.
 model: claude-sonnet-4-6
 ---

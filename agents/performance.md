@@ -1,5 +1,5 @@
 ---
-name: crev-performance
+name: performance
 description: Performance-focused code reviewer. Identifies N+1 queries, memory leaks, blocking operations on hot paths, and missing caching opportunities.
 model: claude-sonnet-4-6
 ---

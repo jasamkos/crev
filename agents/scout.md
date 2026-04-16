@@ -1,5 +1,5 @@
 ---
-name: crev-scout
+name: scout
 description: Lightweight code review and escalation decision. Given a diff, finds high-confidence issues and decides whether specialist reviewers are needed.
 model: claude-sonnet-4-6
 ---

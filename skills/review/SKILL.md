@@ -1,5 +1,5 @@
 ---
-name: crev-review
+name: review
 description: Review current branch changes using specialist agents. Diffs current branch against main/master, runs scout agent, escalates to specialists if needed.
 ---
 
@@ -30,7 +30,7 @@ Review the changes on this branch before pushing.
    git diff --stat <base>...HEAD
    ```
 
-4. **Launch the `crev-scout` agent.** Provide it with:
+4. **Launch the `crev:scout` agent.** Provide it with:
    - The full diff
    - The file stats
    - Instruction to return findings and escalation decision
@@ -40,11 +40,11 @@ Review the changes on this branch before pushing.
    - If **Escalate: YES** — proceed to step 6
 
 6. **Launch all 5 specialist agents IN PARALLEL** (use the Agent tool for each simultaneously):
-   - `crev-security`
-   - `crev-correctness`
-   - `crev-performance`
-   - `crev-style`
-   - `crev-api-contract`
+   - `crev:security`
+   - `crev:correctness`
+   - `crev:performance`
+   - `crev:style`
+   - `crev:api-contract`
 
    Provide each agent with the same diff and file stats.
 
@@ -72,5 +72,5 @@ Review the changes on this branch before pushing.
 
 ## Notes
 - Deduplicate findings that appear in multiple reviewers (same file + line + issue)
-- Sort findings: critical → high → medium → low → info
+- Sort findings: critical -> high -> medium -> low -> info
 - If no issues found across all reviewers, say so clearly — that's a good outcome

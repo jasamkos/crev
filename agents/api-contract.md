@@ -1,5 +1,5 @@
 ---
-name: crev-api-contract
+name: api-contract
 description: API design reviewer. Identifies breaking changes, missing error responses, inconsistent response shapes, and backwards-incompatible interface changes.
 model: claude-sonnet-4-6
 ---

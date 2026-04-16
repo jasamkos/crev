@@ -1,5 +1,5 @@
 ---
-name: crev-audit
+name: audit
 description: Review existing files or directories using specialist agents. Takes an optional path argument (defaults to src/). Agents read files directly rather than reviewing a diff.
 ---
 
@@ -28,11 +28,11 @@ If no path is given, default to `src/`.
    - Focus: review for real issues in the existing code, not a diff
 
    Specialists to launch:
-   - `crev-security`
-   - `crev-correctness`
-   - `crev-performance`
-   - `crev-style`
-   - `crev-api-contract`
+   - `crev:security`
+   - `crev:correctness`
+   - `crev:performance`
+   - `crev:style`
+   - `crev:api-contract`
 
 4. **Present a consolidated report:**
 
@@ -55,5 +55,5 @@ If no path is given, default to `src/`.
 ## Notes
 - Agents should focus on the most important issues — not every minor nit
 - Deduplicate findings across reviewers
-- Sort: critical → high → medium → low → info
+- Sort: critical -> high -> medium -> low -> info
 - This is for reviewing existing code, not changes — frame findings accordingly

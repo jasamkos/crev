@@ -1,5 +1,5 @@
 ---
-name: crev-style
+name: style
 description: Code quality reviewer. Checks for mutation, deep nesting, DRY violations, unclear naming, and oversized functions/files.
 model: claude-sonnet-4-6
 ---
