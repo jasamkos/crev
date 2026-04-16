@@ -11,7 +11,7 @@ fi
 REVIEW_PATH=$(grep '^review:' "$PENDING" | cut -d' ' -f2-)
 BRANCH=$(grep '^branch:' "$PENDING" | cut -d' ' -f2-)
 SUMMARY=$(grep '^summary:' "$PENDING" | cut -d' ' -f2-)
-FINDINGS=$(sed -n '/^findings:/,$ { /^findings:/d; p }' "$PENDING")
+FINDINGS=$(sed -n '/^findings:/,$p' "$PENDING" | tail -n +2)
 
 echo "crev review completed for branch '${BRANCH}':"
 echo "${SUMMARY}"
