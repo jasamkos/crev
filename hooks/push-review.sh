@@ -25,10 +25,8 @@ esac
 # The subshell runs the review, then extracts a summary into .crev-pending
 (
   BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
-  TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-  REPORT="reviews/${BRANCH}-${TIMESTAMP}.md"
 
-  # Run the review skill — output goes to the report file
+  # --dangerously-skip-permissions is required: no TTY for permission prompts in background
   claude --dangerously-skip-permissions -p "/crev:review" > /dev/null 2>&1 || true
 
   # Find the most recent review file (the skill writes it)
@@ -57,7 +55,7 @@ esac
     SUMMARY="No issues found"
   fi
 
-  # Write the marker file
+  # Write marker atomically (write tmp, then mv) to avoid partial reads
   {
     echo "review: $LATEST"
     echo "branch: $BRANCH"
@@ -68,7 +66,8 @@ esac
     else
       echo "- No issues found"
     fi
-  } > .crev-pending
+  } > .crev-pending.tmp
+  mv .crev-pending.tmp .crev-pending
 
 ) &
 disown
