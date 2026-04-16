@@ -1,0 +1,30 @@
+{
+  "name": "crev",
+  "owner": {
+    "name": "jasamkos"
+  },
+  "metadata": {
+    "description": "Code review skills for Claude Code — scout + 5 specialist reviewers",
+    "version": "0.3.0"
+  },
+  "plugins": [
+    {
+      "name": "crev",
+      "source": "./",
+      "description": "Code review skills for Claude Code — scout + 5 specialist reviewers",
+      "version": "0.3.0",
+      "author": {
+        "name": "jasamkos"
+      },
+      "category": "code-review",
+      "keywords": [
+        "code-review",
+        "security",
+        "correctness",
+        "performance",
+        "agents",
+        "skills"
+      ]
+    }
+  ]
+}
