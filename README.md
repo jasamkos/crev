@@ -1,6 +1,6 @@
 # crev
 
-Code review skills for Claude Code. A scout agent reviews your changes and escalates to 5 specialist reviewers when needed. Run `/crev:review` inside Claude Code before pushing — catch issues before they reach PR review.
+Code review plugin for Claude Code. A scout agent reviews your changes and escalates to 5 specialist reviewers when needed. Run `/crev:review` inside Claude Code before pushing — catch issues before they reach PR review.
 
 ## How It Works
 
@@ -27,22 +27,38 @@ Code review skills for Claude Code. A scout agent reviews your changes and escal
 
 ## Install
 
-```bash
-npm install -g crev
-crev init
+Add crev as a marketplace source in `~/.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "crev": {
+      "source": {
+        "source": "github",
+        "repo": "jasamkos/crev"
+      }
+    }
+  }
+}
 ```
 
-The installer will ask:
+Then enable the plugin:
 
-1. **Scope** — global (`~/.claude/`, all projects) or project-local (`.claude/`)
-2. **Model** — Haiku (fast/cheap) · Sonnet (default) · Opus (deepest analysis)
-3. **Auto-trigger** — enable automatic reviews on `git push` (Y/n)
+```json
+{
+  "enabledPlugins": {
+    "crev@crev": true
+  }
+}
+```
+
+Restart Claude Code. The skills, agents, and hooks are loaded automatically.
 
 ## Usage
 
 ### Automatic (hook)
 
-Reviews trigger automatically when you run `git push` inside a Claude Code session. A new Claude instance starts in the background, runs `/crev:review`, and saves the report to `reviews/`.
+Reviews trigger automatically when you run `git push` inside a Claude Code session. A background process runs `/crev:review` and notifies you of the results on your next interaction.
 
 ### Manual (inside Claude Code)
 
@@ -59,33 +75,10 @@ Diffs the current branch against `main` (or `master`) and runs the review. Scout
 
 Reviews existing code at a path without requiring a diff. Useful for auditing existing files or directories you didn't write. All 5 specialists run in parallel.
 
-## File Structure
-
-After `crev init`, the following files are installed:
-
-```
-~/.claude/
-  skills/
-    crev-review.md       # /crev:review skill
-    crev-audit.md        # /crev:audit skill
-  agents/
-    crev-scout.md        # Scout agent
-    crev-security.md     # Security specialist
-    crev-correctness.md  # Correctness specialist
-    crev-performance.md  # Performance specialist
-    crev-style.md        # Style specialist
-    crev-api-contract.md # API Contract specialist
-```
-
 ## Uninstall
 
-```bash
-crev uninstall
-```
-
-Removes all installed skill and agent files and the PostToolUse hook.
+Remove the `"crev@crev": true` entry from `enabledPlugins` and the `"crev"` entry from `extraKnownMarketplaces` in `~/.claude/settings.json`.
 
 ## Prerequisites
 
-- `claude` CLI (Claude Code) installed and configured
-- Node.js >= 20
+- Claude Code CLI installed and configured
