@@ -1,0 +1,27 @@
+{
+  "name": "crev",
+  "version": "0.3.0",
+  "description": "Code review skills for Claude Code — scout + 5 specialist reviewers",
+  "author": {
+    "name": "jasamkos"
+  },
+  "repository": "https://github.com/jasamkos/crev",
+  "license": "MIT",
+  "keywords": [
+    "code-review",
+    "security",
+    "correctness",
+    "performance",
+    "agents",
+    "skills"
+  ],
+  "skills": ["./skills/"],
+  "agents": [
+    "./agents/scout.md",
+    "./agents/security.md",
+    "./agents/correctness.md",
+    "./agents/performance.md",
+    "./agents/style.md",
+    "./agents/api-contract.md"
+  ]
+}
