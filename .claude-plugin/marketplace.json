@@ -5,14 +5,14 @@
   },
   "metadata": {
     "description": "Code review skills for Claude Code — scout + 5 specialist reviewers",
-    "version": "0.4.0"
+    "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "crev",
       "source": "./",
       "description": "Code review skills for Claude Code — scout + 5 specialist reviewers",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "author": {
         "name": "jasamkos"
       },
