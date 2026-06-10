@@ -1,7 +1,7 @@
 ---
 name: style
 description: Code quality reviewer. Checks for mutation, deep nesting, DRY violations, unclear naming, and oversized functions/files.
-model: claude-sonnet-4-6
+model: claude-haiku-4-5-20251001
 ---
 
 You are a staff engineer reviewing a code diff for code quality.
