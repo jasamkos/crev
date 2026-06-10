@@ -16,14 +16,16 @@ Code review plugin for Claude Code. A scout agent reviews your changes and escal
 
 ### Reviewers
 
-| Agent | Scope |
-|-------|-------|
-| Scout | Lightweight review + escalation decision |
-| Security | OWASP Top 10, secrets, injection, auth |
-| Correctness | Logic errors, null handling, race conditions |
-| Performance | N+1 queries, memory leaks, hot paths |
-| Style | Mutation, naming, nesting, DRY |
-| API Contract | Breaking changes, response shapes, status codes |
+| Agent | Scope | Model |
+|-------|-------|-------|
+| Scout | Lightweight review + escalation decision | Sonnet |
+| Security | OWASP Top 10, secrets, injection, auth | **Fable 5** |
+| Correctness | Logic errors, null handling, race conditions | **Fable 5** |
+| Performance | N+1 queries, memory leaks, hot paths | Sonnet |
+| Style | Mutation, naming, nesting, DRY | Haiku |
+| API Contract | Breaking changes, response shapes, status codes | Sonnet |
+
+Model assignments follow a cost-of-being-wrong heuristic: Security and Correctness use Fable 5 because failures are low-detectability, high-blast-radius, and irreversible. Style is cosmetic and reversible — Haiku suffices. Everything else stays on Sonnet.
 
 ## Install
 
@@ -74,6 +76,14 @@ Diffs the current branch against `main` (or `master`) and runs the review. Scout
 ### `/crev:audit`
 
 Reviews existing code at a path without requiring a diff. Useful for auditing existing files or directories you didn't write. All 5 specialists run in parallel.
+
+## Updating
+
+```bash
+claude plugin marketplace update crev && claude plugin update crev@crev
+```
+
+Restart Claude Code to apply. The plugin is version-gated — `claude plugin update` is a no-op until a new version is released.
 
 ## Uninstall
 
