@@ -4,3 +4,4 @@ reviews/
 
 # crev async review marker
 .crev-pending
+CLAUDE.md
