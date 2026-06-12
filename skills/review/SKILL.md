@@ -40,7 +40,9 @@ Use tmux mode if available (steps 4–8). Fall back to Agent tool mode (step 9) 
 
 ## tmux Mode
 
-### 4. Run scout in a tmux window (sequential — gates escalation)
+### 4. Run scout in a tmux window
+
+Scout performs the lightweight review, decides escalation, and — if needed — launches the 5 specialist agents itself as subagents.
 
 ```bash
 tmux new-window -n "crev-scout" \
@@ -52,55 +54,15 @@ Write your full response to $CREV_DIR/scout.md.' \
   > $CREV_DIR/scout.md 2>&1; touch $CREV_DIR/scout.done"
 ```
 
-Poll until done:
+Poll until done (scout may take longer when it escalates to specialists):
 
 ```bash
 while [ ! -f "$CREV_DIR/scout.done" ]; do sleep 2; done
 ```
 
-### 5. Read scout result
+### 5. Read result and present consolidated report
 
-Read `$CREV_DIR/scout.md`. Extract the `Escalate: YES/NO` line.
-
-- **Escalate: NO** → skip to step 8, use scout findings only.
-- **Escalate: YES** → continue to step 6.
-
-### 6. Launch 5 specialists in parallel tmux windows
-
-For each specialist, construct the prompt by reading `$CLAUDE_PLUGIN_ROOT/agents/<role>.md` (skip the YAML frontmatter lines), then append:
-
-```
-The diff is at: $CREV_DIR/diff.patch — read it with the Read tool or cat.
-The stats are at: $CREV_DIR/stats.txt.
-Write your full findings report to $CREV_DIR/<role>.md.
-```
-
-Launch all 5 simultaneously:
-
-```bash
-for ROLE in security correctness performance style api-contract; do
-  PROMPT=$(tail -n +6 "$CLAUDE_PLUGIN_ROOT/agents/$ROLE.md")
-  printf '%s\n\nDiff: %s\nStats: %s\nWrite output to: %s\n' \
-    "$PROMPT" "$CREV_DIR/diff.patch" "$CREV_DIR/stats.txt" "$CREV_DIR/$ROLE.md" \
-    > "$CREV_DIR/$ROLE-prompt.txt"
-  tmux new-window -n "crev-$ROLE" \
-    "claude --print \"$(cat $CREV_DIR/$ROLE-prompt.txt)\" > $CREV_DIR/$ROLE.md 2>&1; touch $CREV_DIR/$ROLE.done"
-done
-```
-
-### 7. Wait for all specialists
-
-Poll until all 5 done files exist:
-
-```bash
-for ROLE in security correctness performance style api-contract; do
-  while [ ! -f "$CREV_DIR/$ROLE.done" ]; do sleep 2; done
-done
-```
-
-### 8. Read results and present consolidated report
-
-Read `$CREV_DIR/scout.md` plus any specialist result files. Then present:
+Read `$CREV_DIR/scout.md`. Scout's output is the full consolidated report (includes specialist findings if it escalated). Present:
 
 ```
 ## Code Review — <branch-name>
@@ -125,9 +87,9 @@ Cleanup: `rm -rf "$CREV_DIR"`
 
 If tmux is not available, use the Agent tool directly:
 
-- Launch `crev:scout` with the diff and stats
-- If escalation needed, launch `crev:security`, `crev:correctness`, `crev:performance`, `crev:style`, `crev:api-contract` in parallel via the Agent tool
-- Consolidate and present the same report format
+- Launch `crev:scout` with the diff path and stats path
+- Scout handles escalation internally — it will spawn specialist subagents itself if needed
+- Read scout's return value and present the same report format
 
 ---
 
