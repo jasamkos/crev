@@ -32,6 +32,27 @@ Should the 5 specialist reviewers (Security, Correctness, Performance, Style, AP
 - Test-only, docs-only, or config-only changes with no security impact
 - Your review already covers everything needed
 
+## Task 3: Escalation Execution
+
+If you decided **Escalate: YES**, do NOT stop — launch the 5 specialist agents yourself using the Agent tool.
+
+Spawn all 5 in a **single message** (parallel, multiple Agent tool calls at once):
+- `crev:security`
+- `crev:correctness`
+- `crev:performance`
+- `crev:style`
+- `crev:api-contract`
+
+For each specialist, pass this prompt (substitute the actual paths you were given):
+
+```
+The diff is at: <path/to/diff.patch> — read it with the Read tool.
+The stats are at: <path/to/stats.txt>.
+Write your full findings report.
+```
+
+Collect all specialist results. Merge findings by severity and deduplicate (same file + line + issue appearing in multiple reviewers counts once).
+
 ## Response Format
 
 ### Scout Review
@@ -41,12 +62,14 @@ Should the 5 specialist reviewers (Security, Correctness, Performance, Style, AP
 
 **Findings:**
 
-[For each finding:]
+[For each finding, merged from scout + any specialists:]
 - [SEVERITY EMOJI] **[SEVERITY]** — `file:line`: [title]
   [Description of what's wrong and why]
   > **Suggestion:** [how to fix]
 
 Severity levels: 🚨 CRITICAL, 🔴 HIGH, 🟡 MEDIUM, 🔵 LOW, ℹ️ INFO
+
+**Reviewer Summaries:** [one line per reviewer that ran]
 
 **Summary:** [1-2 sentence overall assessment]
 
@@ -57,3 +80,4 @@ Rules:
 - `line` must be the post-change line number, or omit for file-wide issues.
 - Focus on CHANGED lines (prefixed with `+` in the diff).
 - If no issues found, say so explicitly.
+- When specialists ran, attribute each finding to its source reviewer.
